@@ -22,6 +22,14 @@
 #include <curses.h>
 #include <term.h>
 
+#ifdef __FreeBSD__
+#define PROCPATH "/compat/linux/proc"
+#elif __linux__
+#define PROCPATH "/proc"
+#else
+#error "Don't know how to find '/proc' on this system"
+#endif
+
 /******************************************************************
  * Utilities
  */
@@ -173,15 +181,15 @@ static int cpustats_buf_size;
 void
 cpustats_init(void)
 {
-        if ((cpustats_fd = open("/proc/stat", O_RDONLY)) < 0)
-                epanic("failed to open /proc/stat");
-        if ((cpustats_load_fd = open("/proc/loadavg", O_RDONLY)) < 0)
-                epanic("failed to open /proc/loadavg");
+        if ((cpustats_fd = open(PROCPATH "/stat", O_RDONLY)) < 0)
+                epanic("failed to open " PROCPATH "/stat");
+        if ((cpustats_load_fd = open(PROCPATH "/loadavg", O_RDONLY)) < 0)
+                epanic("failed to open " PROCPATH "/loadavg");
 
         // Find the maximum number of CPU's we'll need
-        char *poss = read_all("/sys/devices/system/cpu/possible");
-        cpustats_cpus = cpuset_max(poss) + 1;
-        free(poss);
+        // This only gets the current number of CPUs online, precluding CPU
+        // hotplugging for now.
+        cpustats_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
         // Allocate a big buffer to read /proc/stat in to
         cpustats_buf_size = cpustats_cpus * 128;
@@ -193,12 +201,12 @@ void
 cpustats_loadavg(float load[3])
 {
         if ((readn_str(cpustats_load_fd, cpustats_buf, cpustats_buf_size)) < 0)
-                epanic("failed to read /proc/loadavg");
+                epanic("failed to read " PROCPATH "/loadavg");
         if (sscanf(cpustats_buf, "%f %f %f",
                    &load[0], &load[1], &load[2]) != 3)
-                epanic("failed to parse /proc/loadavg");
+                epanic("failed to parse " PROCPATH "/loadavg");
         if ((lseek(cpustats_load_fd, 0, SEEK_SET)) < 0)
-                epanic("failed to seek /proc/loadavg");
+                epanic("failed to seek " PROCPATH "/loadavg");
 }
 
 struct cpustats*
@@ -230,7 +238,7 @@ cpustats_read(struct cpustats *out)
         out->real = time_usec() * sysconf(_SC_CLK_TCK) / 1000000;
 
         if ((readn_str(cpustats_fd, cpustats_buf, cpustats_buf_size)) < 0)
-                epanic("failed to read /proc/stat");
+                epanic("failed to read " PROCPATH "/stat");
 
         char *pos = cpustats_buf;
         while (strncmp(pos, "cpu", 3) == 0) {
@@ -272,7 +280,7 @@ cpustats_read(struct cpustats *out)
         }
 
         if ((lseek(cpustats_fd, 0, SEEK_SET)) < 0)
-                epanic("failed to seek /proc/stat");
+                epanic("failed to seek " PROCPATH "/stat");
 }
 
 static bool

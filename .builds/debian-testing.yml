@@ -1,0 +1,12 @@
+image: debian/testing
+sources:
+- https://git.sr.ht/~tcreech/cpubars
+packages:
+- build-essential
+- libncurses-dev
+tasks:
+- build: |
+   make -C cpubars
+- test: |
+   cpubars/cpubars -h
+

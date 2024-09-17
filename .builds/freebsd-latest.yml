@@ -1,0 +1,12 @@
+image: freebsd/latest
+sources:
+- https://git.sr.ht/~tcreech/cpubars
+packages:
+tasks:
+- setup: |
+   sudo service linux onestart
+- build: |
+   make -C cpubars
+- test: |
+   cpubars/cpubars -h
+
